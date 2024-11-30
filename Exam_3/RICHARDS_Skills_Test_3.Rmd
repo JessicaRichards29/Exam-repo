@@ -1,0 +1,170 @@
+---
+title: "RICHARDS_Skills_Test_3"
+author: "Jessica Richards"
+date: "2024-11-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1a - Cleaning Faculty Salaries Data
+
+Cleaning the data was a bit of a long process but I was able to elongate the data
+so that there was a column for Rank, Salary, Comp and Number.
+
+```{r loading packages, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(janitor)
+library(broom)
+```
+
+
+```{r cleaning faculty salaries, echo=TRUE}
+dat <- read.csv('FacultySalaries_1995.csv')
+
+dat_keep <- dat %>%
+  select(-c(AvgProfSalaryAll, AvgProfCompAll, NumInstructors, NumFacultyAll))
+
+dat_both <- dat_keep %>%
+  select(-c(starts_with('Num')))
+
+dat_salary <- dat_both %>%
+  select(-c(ends_with('Comp'))) %>%
+rename('Full' = 'AvgFullProfSalary',
+       'Assoc' = 'AvgAssocProfSalary',
+       'Assist' = 'AvgAssistProfSalary') %>%
+  pivot_longer(c('Full', 'Assoc', 'Assist'), names_to = 'Rank', values_to = 'Salary')
+
+dat_comp <- dat_both %>%
+  select(-c(ends_with('Salary'))) %>%
+rename('Full' = 'AvgFullProfComp',
+       'Assoc' = 'AvgAssocProfComp',
+       'Assist' = 'AvgAssistProfComp') %>%
+  pivot_longer(c('Full', 'Assoc', 'Assist'), names_to = 'Rank', values_to = 'Comp')
+
+dat_num <- dat_keep %>%
+  select(-c(starts_with('Avg'))) %>%
+   rename('Full' = 'NumFullProfs',
+         'Assoc' = 'NumAssocProfs',
+         'Assist' = 'NumAssistProfs') %>%
+  pivot_longer(c('Full', 'Assoc', 'Assist'), names_to = 'Rank', values_to = 'Number')
+ 
+dat_clean <- dat_num %>%
+  full_join(dat_comp) %>%
+  full_join(dat_salary) %>%
+  filter(Tier != 'VIIB')
+
+
+```
+
+This is a sneak peak of the cleaned Faculty Salaries Data. 
+```{r head faculty salaries, include=TRUE}
+head(dat_clean)
+
+
+
+```
+
+
+# 1b Graphing Faculty Salaries Data
+
+The graphs are separated by Tier and show how average salaries of professors
+are affected by both Rank and Tier. 
+
+Based on the graph, Tier I professors on average make the most while Tier IIB 
+professors make the least. Full professors in all tiers make the most while Assistant
+professors in all tiers make the least. 
+```{r graph faculty salaries, echo=FALSE}
+dat_clean %>%
+  ggplot(aes(x = Rank,
+             y = Salary,
+             fill = Rank)) +
+  geom_boxplot(outlier.color = 'black', outlier.size = 3, size = .8) +
+  facet_wrap(~Tier) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 15),
+        title = element_text(size = 20),
+        strip.text = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+
+
+# 2 Creating an Anova Model of Faculty Salaries
+
+Based on the anova summary, State, Tier and Rank all significantly affect the
+average salary of professors.
+```{r anova model, echo=TRUE, include=TRUE}
+anova_model <- aov(data = dat_clean, Salary ~ State + Tier + Rank)
+summary(anova_model)
+
+```
+
+# 3 Cleaning Juniper Oils Data
+
+To clean this dataset I tidied the names using clean_names in the janitor package,
+then replaced any underscores with hyphens to match the chemical name set provided 
+in the instructions. I then elongated the data so that all of the chemical names 
+were under chemical_id, and the concentrations were under concentration. Finally
+I once again used clean_names to change hyphens in column names to underscores. 
+```{r cleaning juniper oils, echo=TRUE, include=TRUE}
+dat_oils <- read.csv('Juniper_Oils.csv')
+
+dat_oils <- dat_oils %>%
+  clean_names() %>%
+  rename_with(~ gsub("_", "-", .))
+
+dat_oils_clean <- dat_oils %>%
+  pivot_longer( cols = c("alpha-pinene","para-cymene","alpha-terpineol",
+                         "cedr-9-ene","alpha-cedrene","beta-cedrene",
+                         "cis-thujopsene","alpha-himachalene","beta-chamigrene",
+                         "cuparene","compound-1","alpha-chamigrene","widdrol",
+                         "cedrol","beta-acorenol","alpha-acorenol",
+                         "gamma-eudesmol","beta-eudesmol","alpha-eudesmol",
+                         "cedr-8-en-13-ol","cedr-8-en-15-ol","compound-2",
+                         "thujopsenal"), 
+                names_to = 'ChemicalID',
+                values_to = 'Concentration') %>%
+  clean_names()
+
+
+```
+
+
+This is a sneak peak of the cleaned Juniper Oils Data.
+
+Since there are so many columns it doesn't display well, but the most important
+things are that there are now columns for chemical_id and concentration, 
+instead of a ton of columns for each individual chemical. 
+```{r head Juniper Oils, echo=FALSE, include=TRUE}
+head(dat_oils_clean)
+
+```
+
+# 4 Graphing Juniper Oils Data
+
+```{r graphing Juniper Oils, echo=FALSE, include=TRUE}
+dat_oils_clean %>%
+ggplot(aes(x = years_since_burn,
+           y = concentration)) +
+  geom_smooth() +
+  facet_wrap(~chemical_id, scales = 'free') +
+  theme_minimal()
+
+```
+
+# 5 Modeling Juniper Oils Data
+
+The dataframe tidy_model shows which chemicals' concentrations are significantly 
+(p < 0.05) affected by years_since_burn. 
+```{r Juniper Oils model, echo=TRUE, include=TRUE}
+model <- glm(data = dat_oils_clean, concentration ~ years_since_burn * chemical_id)
+tidy_model <- tidy(model) %>%
+  filter(p.value < 0.05)
+
+head(tidy_model)
+
+```
